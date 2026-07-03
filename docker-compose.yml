@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: stock-web
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - ./stock-app:/var/www/html
+
+    depends_on:
+      - db
+      
+    env_file:
+      - ./stock-app/.env
+    restart: unless-stopped
+
+  db:
+    image: mariadb:11
+
+    container_name: stock-db
+
+    restart: unless-stopped
+
+    environment:
+      MYSQL_ROOT_PASSWORD: 5345
+      MYSQL_DATABASE: stock_app
+      MYSQL_USER: stockuser
+      MYSQL_PASSWORD: 5345
+
+    ports:
+      - "3306:3306"
+
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./stock-app/database:/docker-entrypoint-initdb.d
+      - ./stock-app/database/migrations:/docker-entrypoint-initdb.d/migrations
+      - ./stock-app/database/seeds:/docker-entrypoint-initdb.d/seeds
+      - ./docker/mariadb/init.sh:/docker-entrypoint-initdb.d/init.sh
+      
+
+volumes:
+  db_data:
