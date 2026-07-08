@@ -19,10 +19,6 @@ RUN apt-get update && apt-get install -y \
         curl \
         zip \
         gd
-
-#test apache error railway:
-RUN a2dismod mpm_event mpm_worker || true \
- && a2enmod mpm_prefork
  
 # Apache modules
 RUN a2enmod rewrite headers ssl
