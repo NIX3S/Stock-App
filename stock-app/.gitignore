@@ -10,3 +10,4 @@
 .DS_Store
 vendor/*
 vendor
+stock-app/vendor/*
