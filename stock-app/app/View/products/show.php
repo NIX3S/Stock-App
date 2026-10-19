@@ -6,6 +6,7 @@ $title = $product['name'];
 ?>
 <div class="d-flex justify-content-between align-items-start mb-3">
     <div>
+        <a href="/products" class="btn btn-outline-secondary btn-sm mb-2">← Retour</a><br>
         <h1 class="h4 mb-1"><?= htmlspecialchars($product['name']) ?></h1>
         <span class="badge bg-<?= $product['status'] === 'active' ? 'success' : 'secondary' ?>"><?= htmlspecialchars($product['status']) ?></span>
         <span class="badge bg-light text-dark"><?= htmlspecialchars($product['barcode_type'] === 'internal' ? 'Code interne' : 'Code fabricant') ?></span>

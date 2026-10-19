@@ -87,4 +87,75 @@ final class BackupService
         rsort($files);
         return array_map(fn($f) => ['name' => basename($f), 'size' => filesize($f), 'date' => filemtime($f)], $files);
     }
+
+    /**
+     * Restaure la base de données depuis un fichier SQL uploadé ou stocké.
+     * Retourne true si succès, false sinon.
+     */
+    public function restore(string $sqlFilePath, int $byUserId): bool
+    {
+        if (!file_exists($sqlFilePath)) {
+            return false;
+        }
+
+        $config = Config::all();
+        $db = $config['db'];
+
+        if ($this->canUseMysqldump()) {
+            $cmd = sprintf(
+                'mysql --host=%s --port=%s --user=%s --password=%s %s < %s',
+                escapeshellarg($db['host']),
+                escapeshellarg((string) $db['port']),
+                escapeshellarg($db['user']),
+                escapeshellarg($db['pass']),
+                escapeshellarg($db['name']),
+                escapeshellarg($sqlFilePath)
+            );
+            exec($cmd, $output, $returnCode);
+            $success = $returnCode === 0;
+        } else {
+            // Repli PDO : exécute les instructions SQL une par une
+            $success = $this->restoreWithPdo($sqlFilePath);
+        }
+
+        if ($success) {
+            Logger::record('backup.restored', $byUserId, 'backup', null, ['file' => basename($sqlFilePath)]);
+        }
+
+        return $success;
+    }
+
+    private function restoreWithPdo(string $sqlFilePath): bool
+    {
+        try {
+            $pdo = \App\Core\Database::connection();
+            $sql = file_get_contents($sqlFilePath);
+            if ($sql === false) return false;
+
+            // Découpe en statements (simpliste mais suffisant pour des dumps mysqldump/PDO propres)
+            $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
+            $statements = array_filter(
+                array_map('trim', explode(";\n", $sql)),
+                fn($s) => $s !== '' && !str_starts_with($s, '--')
+            );
+            foreach ($statements as $stmt) {
+                if (trim($stmt)) {
+                    $pdo->exec($stmt);
+                }
+            }
+            $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    public function deleteBackup(string $filename): bool
+    {
+        $path = rtrim($this->backupDir, '/') . '/' . basename($filename);
+        if (file_exists($path) && str_ends_with($path, '.sql')) {
+            return unlink($path);
+        }
+        return false;
+    }
 }

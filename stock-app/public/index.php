@@ -97,6 +97,7 @@ $router->get('/stock-entries/create', fn(Request $r) => (new StockEntryControlle
 $router->post('/stock-entries', fn(Request $r) => (new StockEntryController())->store($r), [$auth, $perm('stock.entry.create')]);
 $router->get('/stock-entries/{id}/edit', fn(Request $r, string $id) => (new StockEntryController())->edit($r, $id), [$auth, $perm('stock.entry.create')]);
 $router->post('/stock-entries/{id}/edit', fn(Request $r, string $id) => (new StockEntryController())->update($r, $id), [$auth, $perm('stock.entry.create')]);
+$router->post('/stock-entries/{id}/merge', fn(Request $r, string $id) => (new StockEntryController())->merge($r, $id), [$auth, $perm('stock.entry.create')]);
 $router->get('/stock-entries/{id}/print-label', fn(Request $r, string $id) => (new StockEntryController())->printLabel($r, $id), [$auth, $perm('stock.entry.create')]);
 
 // --- Catégories ---
@@ -155,7 +156,10 @@ $router->get('/settings/backup/{filename}', fn(Request $r, string $f) => (new Se
 // --- API JSON (datatables, préférences, scanner) ---
 $router->get('/api/products', fn(Request $r) => (new ProductApiController())->list($r), [$auth, $perm('product.view')]);
 $router->get('/api/stock-entries', fn(Request $r) => (new StockApiController())->listEntries($r), [$auth, $perm('stock.entry.view')]);
+$router->get('/api/stock-entries/check-duplicate', fn(Request $r) => (new StockApiController())->checkDuplicate($r), [$auth, $perm('stock.entry.view')]);
 $router->get('/api/preferences/{tableKey}', fn(Request $r, string $k) => (new UserPreferenceApiController())->get($r, $k), [$auth]);
 $router->post('/api/preferences/{tableKey}', fn(Request $r, string $k) => (new UserPreferenceApiController())->save($r, $k), [$auth]);
+$router->post('/settings/backup/restore', fn(Request $r) => (new SettingsController())->restoreBackup($r), [$auth, $perm('backup.manage')]);
+$router->post('/settings/backup/{filename}/delete', fn(Request $r, string $f) => (new SettingsController())->deleteBackup($r, $f), [$auth, $perm('backup.manage')]);
 
 $router->dispatch(new Request());

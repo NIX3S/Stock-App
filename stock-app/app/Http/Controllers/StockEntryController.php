@@ -22,6 +22,45 @@ final class StockEntryController
     ) {
     }
 
+    /**
+     * Fusionne une nouvelle quantité dans une entrée existante (doublon confirmé par l'utilisateur).
+     */
+    public function merge(Request $request, string $id): void
+    {
+        Csrf::verifyRequestOrFail($request);
+
+        $repo     = new \App\Domain\Stock\StockEntryRepository();
+        $entry    = $repo->findById((int) $id);
+        if (!$entry) {
+            Session::flash('error', 'Entrée introuvable.');
+            Response::redirect('/stock-entries');
+        }
+
+        $quantity = (int) $request->input('quantity', 1);
+        if ($quantity < 1) {
+            Session::flash('error', 'Quantité invalide.');
+            Response::redirect('/stock-entries');
+        }
+
+        $repo->incrementRemaining((int) $id, $quantity);
+
+        // Log
+        \App\Core\Logger::log(
+            'stock_entry_merge',
+            "Ajout de {$quantity} unité(s) à l'entrée #{$id} (produit #{$entry['product_id']})",
+            (int) Session::get('user_id')
+        );
+
+        $action = $request->input('action', 'save');
+        if ($action === 'save_and_print') {
+            Session::flash('success', "Quantité ajoutée à l'entrée existante. Impression…");
+            Response::redirect('/print/label-single?product_id=' . $entry['product_id']);
+        }
+
+        Session::flash('success', "Quantité ajoutée à l'entrée existante (ID #{$id}).");
+        Response::redirect('/stock-entries');
+    }
+
     public function edit(Request $request, string $id): void
     {
         $entry = (new \App\Domain\Stock\StockEntryRepository())->findById((int) $id);

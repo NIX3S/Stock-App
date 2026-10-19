@@ -16,6 +16,47 @@ final class StockEntryRepository
         $this->pdo = Database::connection();
     }
 
+    /**
+     * Cherche une entrée existante avec le même produit + même date d'expiration + même origine.
+     * Retourne l'entrée si trouvée, null sinon.
+     */
+    public function findDuplicate(int $productId, ?string $expiryDate, ?string $origin): ?array
+    {
+        $where = ['se.product_id = :product_id'];
+        $params = ['product_id' => $productId];
+
+        if ($expiryDate) {
+            $where[] = 'se.expiry_date = :expiry_date';
+            $params['expiry_date'] = $expiryDate;
+        } else {
+            $where[] = 'se.expiry_date IS NULL';
+        }
+
+        if ($origin) {
+            $where[] = 'se.origin = :origin';
+            $params['origin'] = $origin;
+        }
+
+        $sql = 'SELECT se.*, p.name AS product_name FROM stock_entries se
+                JOIN products p ON p.id = se.product_id
+                WHERE ' . implode(' AND ', $where) . '
+                ORDER BY se.entry_date DESC LIMIT 1';
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    public function incrementRemaining(int $entryId, int $quantity): void
+    {
+        $stmt = $this->pdo->prepare(
+            'UPDATE stock_entries
+             SET quantity = quantity + :qty, remaining_quantity = remaining_quantity + :qty2
+             WHERE id = :id'
+        );
+        $stmt->execute(['qty' => $quantity, 'qty2' => $quantity, 'id' => $entryId]);
+    }
+
     public function create(array $data): int
     {
         $stmt = $this->pdo->prepare(
@@ -131,10 +172,21 @@ final class StockEntryRepository
             $where[] = 'se.expiry_date IS NOT NULL AND se.expiry_date <= DATE_ADD(CURDATE(), INTERVAL :days DAY)';
             $params['days'] = (int) $filters['expiring_soon_days'];
         }
+        if (!empty($filters['search'])) {
+            $where[] = '(p.name LIKE :search OR se.origin LIKE :search OR se.comment LIKE :search)';
+            $params['search'] = '%' . $filters['search'] . '%';
+        }
+        if (!empty($filters['expiry_type'])) {
+            $where[] = 'se.expiry_type = :expiry_type';
+            $params['expiry_type'] = $filters['expiry_type'];
+        }
+        if (isset($filters['in_stock']) && $filters['in_stock'] === '1') {
+            $where[] = 'se.remaining_quantity > 0';
+        }
         $whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
         $offset = ($page - 1) * $perPage;
 
-        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM stock_entries se {$whereSql}");
+        $countStmt = $this->pdo->prepare("SELECT COUNT(*) FROM stock_entries se JOIN products p ON p.id = se.product_id {$whereSql}");
         $countStmt->execute($params);
         $total = (int) $countStmt->fetchColumn();
 

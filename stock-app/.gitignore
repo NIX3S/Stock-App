@@ -8,4 +8,5 @@
 /public/uploads/*
 !/public/uploads/.gitkeep
 .DS_Store
-vendor/
+vendor/*
+vendor

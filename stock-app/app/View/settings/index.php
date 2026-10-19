@@ -97,27 +97,53 @@ function renderCustomFieldList(array $fields, string $section): void {
 
     <!-- Sauvegardes -->
     <div class="col-md-5">
-        <div class="card card-body">
+        <div class="card card-body mb-3">
             <h2 class="h6">Sauvegardes</h2>
             <form method="POST" action="/settings/backup" class="mb-3">
                 <?= Csrf::field() ?>
-                <button class="btn btn-success">Lancer une sauvegarde maintenant</button>
+                <button class="btn btn-success btn-sm">⬇️ Créer une sauvegarde maintenant</button>
             </form>
             <ul class="list-group">
                 <?php foreach ($backups as $b): ?>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <span>
-                            <?= htmlspecialchars($b['name']) ?>
-                            <span class="text-muted small">(<?= number_format($b['size'] / 1024, 0) ?> Ko)</span>
+                    <li class="list-group-item d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                        <span class="small">
+                            <?= htmlspecialchars($b['name']) ?><br>
+                            <span class="text-muted"><?= number_format($b['size'] / 1024, 0) ?> Ko — <?= date('d/m/Y H:i', $b['date']) ?></span>
                         </span>
-                        <a href="/settings/backup/<?= htmlspecialchars($b['name']) ?>"
-                           class="btn btn-sm btn-outline-primary">Télécharger</a>
+                        <div class="d-flex gap-1">
+                            <a href="/settings/backup/<?= htmlspecialchars($b['name']) ?>"
+                               class="btn btn-sm btn-outline-primary">Télécharger</a>
+                            <form method="POST" action="/settings/backup/<?= htmlspecialchars($b['name']) ?>/delete"
+                                  onsubmit="return confirm('Supprimer cette sauvegarde ?')">
+                                <?= Csrf::field() ?>
+                                <button class="btn btn-sm btn-outline-danger">✕</button>
+                            </form>
+                        </div>
                     </li>
                 <?php endforeach; ?>
                 <?php if (!$backups): ?>
                     <li class="list-group-item text-muted">Aucune sauvegarde.</li>
                 <?php endif; ?>
             </ul>
+        </div>
+
+        <!-- Restauration depuis un fichier uploadé -->
+        <div class="card card-body border-warning">
+            <h2 class="h6 text-warning">⚠️ Restaurer depuis un fichier SQL</h2>
+            <p class="text-muted small mb-2">
+                Cette opération <strong>remplace intégralement</strong> la base de données par le contenu du fichier uploadé.
+                Faites d'abord une sauvegarde si nécessaire. Fichiers <code>.sql</code> uniquement, max 50 Mo.
+            </p>
+            <form method="POST" action="/settings/backup/restore" enctype="multipart/form-data">
+                <?= Csrf::field() ?>
+                <div class="mb-2">
+                    <input type="file" class="form-control form-control-sm" name="backup_file" accept=".sql" required>
+                </div>
+                <button class="btn btn-warning btn-sm"
+                        onclick="return confirm('⚠️ ATTENTION : Ceci va écraser toute la base de données. Continuer ?')">
+                    🔄 Restaurer la base de données
+                </button>
+            </form>
         </div>
     </div>
 </div>

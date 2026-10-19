@@ -5,7 +5,10 @@ use App\Core\Csrf;
 $isEdit = $product !== null;
 $title  = $isEdit ? 'Modifier le produit' : 'Nouveau produit';
 ?>
-<h1 class="h4 mb-3"><?= htmlspecialchars($title) ?></h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0"><?= htmlspecialchars($title) ?></h1>
+    <a href="<?= $isEdit ? '/products/' . $product['id'] : '/products' ?>" class="btn btn-outline-secondary btn-sm">← Retour</a>
+</div>
 
 <form method="POST"
       action="<?= $isEdit ? '/products/' . $product['id'] : '/products' ?>"

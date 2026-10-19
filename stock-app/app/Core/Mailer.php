@@ -43,7 +43,13 @@ final class Mailer
             $mail->SMTPSecure = ((int)($config['mail']['port'] ?? 587) === 465)
                                 ? PHPMailer::ENCRYPTION_SMTPS
                                 : PHPMailer::ENCRYPTION_STARTTLS;
-
+            $mail->SMTPOptions = [
+                'ssl' => [
+                    'verify_peer'       => false,
+                    'verify_peer_name'  => false,
+                    'allow_self_signed' => true,
+                ],
+            ];
             // Debug SMTP dans les logs PHP (0 = off, 2 = complet)
             $mail->SMTPDebug  = SMTP::DEBUG_OFF;
             $mail->Debugoutput = function (string $str, int $level): void {

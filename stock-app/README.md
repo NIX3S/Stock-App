@@ -229,8 +229,9 @@ Formats supportés : EAN-13, EAN-8, Code128, Code39, QR, UPC-A, UPC-E, ITF, Coda
 
 ---
 
-## Roadmap
+## Roadmap suggérée
 
+- [ ] Gestion des catégories (CRUD — table `categories` déjà présente)
 - [ ] Statistiques de mouvements par période (graphiques dashboard enrichis)
 - [ ] Import CSV de produits en masse
 - [ ] Notifications e-mail automatiques pour les produits sous le seuil minimum

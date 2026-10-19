@@ -4,7 +4,10 @@ use App\Core\Csrf;
 
 $title = 'Utilisateur : ' . $user['first_name'];
 ?>
-<h1 class="h4 mb-3"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0"><?= htmlspecialchars($user['first_name'] . ' ' . $user['last_name']) ?></h1>
+    <a href="/users" class="btn btn-outline-secondary btn-sm">← Retour</a>
+</div>
 
 <div class="row g-3">
     <div class="col-md-6">

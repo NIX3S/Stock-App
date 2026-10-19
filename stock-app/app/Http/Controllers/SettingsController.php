@@ -86,4 +86,67 @@ final class SettingsController
         readfile($path);
         exit;
     }
+
+    public function restoreBackup(Request $request): void
+    {
+        Csrf::verifyRequestOrFail($request);
+
+        $uploadedFile = $_FILES['backup_file'] ?? null;
+        if (!$uploadedFile || $uploadedFile['error'] !== UPLOAD_ERR_OK) {
+            Session::flash('error', 'Erreur lors de l\'upload du fichier.');
+            Response::redirect('/settings');
+        }
+
+        $tmpPath  = $uploadedFile['tmp_name'];
+        $origName = basename($uploadedFile['name']);
+
+        // Vérification extension
+        if (!str_ends_with(strtolower($origName), '.sql')) {
+            Session::flash('error', 'Seuls les fichiers .sql sont acceptés.');
+            Response::redirect('/settings');
+        }
+
+        // Vérification taille max : 50 Mo
+        if ($uploadedFile['size'] > 50 * 1024 * 1024) {
+            Session::flash('error', 'Fichier trop volumineux (max 50 Mo).');
+            Response::redirect('/settings');
+        }
+
+        // Vérification contenu : doit commencer par du SQL reconnaissable
+        $firstBytes = file_get_contents($tmpPath, false, null, 0, 512);
+        if (!preg_match('/^\s*(--|CREATE|INSERT|SET|DROP|USE|BEGIN|LOCK|UNLOCK|\/\*)/i', (string) $firstBytes)) {
+            Session::flash('error', 'Le fichier ne ressemble pas à un dump SQL valide.');
+            Response::redirect('/settings');
+        }
+
+        // Copie dans le dossier backups avant restore
+        $destName = 'restore_' . date('Y-m-d_His') . '_' . preg_replace('/[^a-zA-Z0-9_.-]/', '', $origName);
+        $destPath = __DIR__ . '/../../../database/backups/' . $destName;
+        if (!move_uploaded_file($tmpPath, $destPath)) {
+            Session::flash('error', 'Impossible de sauvegarder le fichier uploadé.');
+            Response::redirect('/settings');
+        }
+
+        $success = $this->backups->restore($destPath, (int) Session::get('user_id'));
+
+        if ($success) {
+            Session::flash('success', 'Base de données restaurée avec succès depuis « ' . htmlspecialchars($origName) . ' ».');
+        } else {
+            Session::flash('error', 'La restauration a échoué. Vérifiez les logs ou le fichier SQL.');
+        }
+
+        Response::redirect('/settings');
+    }
+
+    public function deleteBackup(Request $request, string $filename): void
+    {
+        Csrf::verifyRequestOrFail($request);
+        $deleted = $this->backups->deleteBackup(basename($filename));
+        if ($deleted) {
+            Session::flash('success', 'Sauvegarde supprimée.');
+        } else {
+            Session::flash('error', 'Impossible de supprimer la sauvegarde.');
+        }
+        Response::redirect('/settings');
+    }
 }

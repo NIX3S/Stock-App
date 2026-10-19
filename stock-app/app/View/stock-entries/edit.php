@@ -4,7 +4,10 @@ use App\Core\Csrf;
 
 $title = 'Modifier l\'entrée de stock';
 ?>
-<h1 class="h4 mb-3">Modifier une entrée de stock</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0">Modifier une entrée de stock</h1>
+    <a href="/stock-entries" class="btn btn-outline-secondary btn-sm">← Retour</a>
+</div>
 
 <div class="alert alert-info small">
     <strong>Produit :</strong> <?= htmlspecialchars($product['name'] ?? '—') ?>

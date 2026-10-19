@@ -10,7 +10,10 @@ if (!empty($presetProductId)) {
     $presetProduct = (new \App\Domain\Product\ProductRepository())->findById((int) $presetProductId);
 }
 ?>
-<h1 class="h4 mb-3">Nouvelle entrée de stock</h1>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h4 mb-0">Nouvelle entrée de stock</h1>
+    <a href="/stock-entries" class="btn btn-outline-secondary btn-sm">← Retour</a>
+</div>
 <meta name="csrf-token" content="<?= htmlspecialchars(\App\Core\Csrf::token()) ?>">
 
 <div class="row g-3">
@@ -138,7 +141,30 @@ if (!empty($presetProductId)) {
                 </div>
             <?php endif; ?>
 
-            <div class="d-flex gap-2 mt-3">
+            <!-- Alerte doublon (affichée dynamiquement) -->
+            <div id="duplicate-alert" class="alert alert-warning d-none mt-3">
+                <strong>⚠️ Entrée similaire détectée</strong><br>
+                <span id="duplicate-info"></span><br>
+                <div class="mt-2 d-flex gap-2 flex-wrap">
+                    <button type="button" id="btn-merge-save" class="btn btn-warning btn-sm">
+                        ➕ Ajouter à l'entrée existante
+                    </button>
+                    <button type="button" id="btn-merge-print" class="btn btn-warning btn-sm">
+                        ➕ Ajouter et imprimer
+                    </button>
+                    <button type="button" id="btn-ignore-duplicate" class="btn btn-outline-secondary btn-sm">
+                        Créer quand même une nouvelle entrée
+                    </button>
+                </div>
+                <!-- Formulaire caché pour la fusion -->
+                <form id="merge-form" method="POST" action="" class="d-none">
+                    <?= Csrf::field() ?>
+                    <input type="hidden" name="quantity" id="merge-qty">
+                    <input type="hidden" name="action" id="merge-action" value="save">
+                </form>
+            </div>
+
+            <div class="d-flex gap-2 mt-3" id="submit-buttons">
                 <button type="submit" name="action" value="save" class="btn btn-primary">
                     Enregistrer
                 </button>
@@ -176,6 +202,9 @@ async function lookupBarcode(code) {
     document.getElementById('product-not-found').classList.add('d-none');
     // Focus sur la quantité pour une saisie rapide
     document.getElementById('qty-field').focus();
+    // Vérif doublon après identification produit
+    clearTimeout(duplicateCheckTimeout);
+    duplicateCheckTimeout = setTimeout(checkDuplicate, 500);
 }
 
 scanBtn.addEventListener('click', async () => {
@@ -216,4 +245,81 @@ document.getElementById('manual-barcode').addEventListener('keypress', (e) => {
         document.getElementById('manual-lookup-btn').click();
     }
 });
+
+// ---------- Détection de doublons ----------
+let duplicateEntryId = null;
+let duplicateCheckTimeout = null;
+
+async function checkDuplicate() {
+    const productId  = document.getElementById('product-id-field').value;
+    const expiryDate = document.querySelector('[name="expiry_date"]')?.value || '';
+    const origin     = document.querySelector('[name="origin"]')?.value || '';
+
+    if (!productId) return;
+
+    const params = new URLSearchParams({ product_id: productId });
+    if (expiryDate) params.set('expiry_date', expiryDate);
+    if (origin) params.set('origin', origin);
+
+    try {
+        const res = await fetch(`/api/stock-entries/check-duplicate?${params}`);
+        const data = await res.json();
+
+        const alert = document.getElementById('duplicate-alert');
+        const submitBtns = document.getElementById('submit-buttons');
+
+        if (data.duplicate) {
+            duplicateEntryId = data.entry_id;
+            const expLabel = data.expiry_date ? ` — Expiration : ${data.expiry_date}` : '';
+            document.getElementById('duplicate-info').innerHTML =
+                `<strong>${data.product_name}</strong> — Stock actuel : <strong>${data.current_quantity}</strong> unités${expLabel}<br>` +
+                `Entrée du ${data.entry_date}${data.origin ? ' — Origine : ' + data.origin : ''}`;
+            alert.classList.remove('d-none');
+        } else {
+            duplicateEntryId = null;
+            alert.classList.add('d-none');
+        }
+    } catch (e) {
+        // Silencieux si erreur réseau
+    }
+}
+
+// Déclenche la vérification quand les champs clés changent
+['expiry_date', 'origin'].forEach(name => {
+    document.querySelector(`[name="${name}"]`)?.addEventListener('change', () => {
+        clearTimeout(duplicateCheckTimeout);
+        duplicateCheckTimeout = setTimeout(checkDuplicate, 400);
+    });
+});
+
+// Bouton "Ignorer le doublon" : cache l'alerte et laisse soumettre normalement
+document.getElementById('btn-ignore-duplicate').addEventListener('click', () => {
+    duplicateEntryId = null;
+    document.getElementById('duplicate-alert').classList.add('d-none');
+});
+
+// Bouton "Fusionner (enregistrer)"
+document.getElementById('btn-merge-save').addEventListener('click', () => {
+    if (!duplicateEntryId) return;
+    const qty = document.getElementById('qty-field').value;
+    const mergeForm = document.getElementById('merge-form');
+    mergeForm.action = `/stock-entries/${duplicateEntryId}/merge`;
+    document.getElementById('merge-qty').value = qty;
+    document.getElementById('merge-action').value = 'save';
+    mergeForm.classList.remove('d-none');
+    mergeForm.submit();
+});
+
+// Bouton "Fusionner + imprimer"
+document.getElementById('btn-merge-print').addEventListener('click', () => {
+    if (!duplicateEntryId) return;
+    const qty = document.getElementById('qty-field').value;
+    const mergeForm = document.getElementById('merge-form');
+    mergeForm.action = `/stock-entries/${duplicateEntryId}/merge`;
+    document.getElementById('merge-qty').value = qty;
+    document.getElementById('merge-action').value = 'save_and_print';
+    mergeForm.classList.remove('d-none');
+    mergeForm.submit();
+});
+
 </script>

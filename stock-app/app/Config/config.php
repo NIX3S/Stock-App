@@ -39,7 +39,6 @@ if (!function_exists('env')) {
 }
 
 $root = dirname(__DIR__, 2);
-
 loadEnv($root . '/.env');
 
 return [

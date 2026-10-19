@@ -9,7 +9,7 @@
 <body>
 <div class="no-print text-end p-2">
     <button class="btn btn-primary" onclick="window.print()">Imprimer</button>
-    <a href="javascript:history.back()" class="btn btn-outline-secondary">Retour</a>
+    <button class="btn btn-outline-secondary" onclick="window.close()">✕ Fermer l'onglet</button>
 </div>
 <div class="print-content">
     <?= $content ?>
