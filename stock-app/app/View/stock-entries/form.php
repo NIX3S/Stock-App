@@ -156,12 +156,6 @@ if (!empty($presetProductId)) {
                         Créer quand même une nouvelle entrée
                     </button>
                 </div>
-                <!-- Formulaire caché pour la fusion -->
-                <form id="merge-form" method="POST" action="" class="d-none">
-                    <?= Csrf::field() ?>
-                    <input type="hidden" name="quantity" id="merge-qty">
-                    <input type="hidden" name="action" id="merge-action" value="save">
-                </form>
             </div>
 
             <div class="d-flex gap-2 mt-3" id="submit-buttons">
@@ -177,8 +171,52 @@ if (!empty($presetProductId)) {
     </div>
 </div>
 
+<!-- Formulaire de fusion HORS du formulaire principal (HTML interdit les form imbriqués) -->
+<form id="merge-form" method="POST" action="" class="d-none">
+    <?= Csrf::field() ?>
+    <input type="hidden" name="quantity" id="merge-qty">
+    <input type="hidden" name="action" id="merge-action" value="save">
+</form>
+
 <script type="module">
 import { BarcodeScanner, attachScanButton } from '/assets/js/modules/scanner.js';
+
+// ---------- Détection de doublons (déclaré en premier pour usage dans lookupBarcode) ----------
+let duplicateEntryId = null;
+let duplicateCheckTimeout = null;
+
+async function checkDuplicate() {
+    const productId  = document.getElementById('product-id-field').value;
+    const expiryDate = document.querySelector('[name="expiry_date"]')?.value || '';
+    const origin     = document.querySelector('[name="origin"]')?.value || '';
+
+    if (!productId) return;
+
+    const params = new URLSearchParams({ product_id: productId });
+    if (expiryDate) params.set('expiry_date', expiryDate);
+    if (origin) params.set('origin', origin);
+
+    try {
+        const res = await fetch(`/api/stock-entries/check-duplicate?${params}`);
+        const data = await res.json();
+
+        const alertEl = document.getElementById('duplicate-alert');
+
+        if (data.duplicate) {
+            duplicateEntryId = data.entry_id;
+            const expLabel = data.expiry_date ? ` — Expiration : ${data.expiry_date}` : '';
+            document.getElementById('duplicate-info').innerHTML =
+                `<strong>${data.product_name}</strong> — Stock actuel : <strong>${data.current_quantity}</strong> unités${expLabel}<br>` +
+                `Entrée du ${data.entry_date}${data.origin ? ' — Origine : ' + data.origin : ''}`;
+            alertEl.classList.remove('d-none');
+        } else {
+            duplicateEntryId = null;
+            alertEl.classList.add('d-none');
+        }
+    } catch (e) {
+        // Silencieux si erreur réseau
+    }
+}
 
 // ---------- Scanner dédié pour l'entrée de stock ----------
 let entryScanner = null;
@@ -245,44 +283,6 @@ document.getElementById('manual-barcode').addEventListener('keypress', (e) => {
         document.getElementById('manual-lookup-btn').click();
     }
 });
-
-// ---------- Détection de doublons ----------
-let duplicateEntryId = null;
-let duplicateCheckTimeout = null;
-
-async function checkDuplicate() {
-    const productId  = document.getElementById('product-id-field').value;
-    const expiryDate = document.querySelector('[name="expiry_date"]')?.value || '';
-    const origin     = document.querySelector('[name="origin"]')?.value || '';
-
-    if (!productId) return;
-
-    const params = new URLSearchParams({ product_id: productId });
-    if (expiryDate) params.set('expiry_date', expiryDate);
-    if (origin) params.set('origin', origin);
-
-    try {
-        const res = await fetch(`/api/stock-entries/check-duplicate?${params}`);
-        const data = await res.json();
-
-        const alert = document.getElementById('duplicate-alert');
-        const submitBtns = document.getElementById('submit-buttons');
-
-        if (data.duplicate) {
-            duplicateEntryId = data.entry_id;
-            const expLabel = data.expiry_date ? ` — Expiration : ${data.expiry_date}` : '';
-            document.getElementById('duplicate-info').innerHTML =
-                `<strong>${data.product_name}</strong> — Stock actuel : <strong>${data.current_quantity}</strong> unités${expLabel}<br>` +
-                `Entrée du ${data.entry_date}${data.origin ? ' — Origine : ' + data.origin : ''}`;
-            alert.classList.remove('d-none');
-        } else {
-            duplicateEntryId = null;
-            alert.classList.add('d-none');
-        }
-    } catch (e) {
-        // Silencieux si erreur réseau
-    }
-}
 
 // Déclenche la vérification quand les champs clés changent
 ['expiry_date', 'origin'].forEach(name => {

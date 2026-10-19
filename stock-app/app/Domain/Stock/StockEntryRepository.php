@@ -20,7 +20,10 @@ final class StockEntryRepository
      * Cherche une entrée existante avec le même produit + même date d'expiration + même origine.
      * Retourne l'entrée si trouvée, null sinon.
      */
-    public function findDuplicate(int $productId, ?string $expiryDate, ?string $origin): ?array
+    /**
+     * @param int|null $excludeId  Exclure cette entrée de la recherche (utile lors d'une modification)
+     */
+    public function findDuplicate(int $productId, ?string $expiryDate, ?string $origin, ?int $excludeId = null): ?array
     {
         $where = ['se.product_id = :product_id'];
         $params = ['product_id' => $productId];
@@ -37,6 +40,11 @@ final class StockEntryRepository
             $params['origin'] = $origin;
         }
 
+        if ($excludeId) {
+            $where[] = 'se.id != :exclude_id';
+            $params['exclude_id'] = $excludeId;
+        }
+
         $sql = 'SELECT se.*, p.name AS product_name FROM stock_entries se
                 JOIN products p ON p.id = se.product_id
                 WHERE ' . implode(' AND ', $where) . '
@@ -45,6 +53,16 @@ final class StockEntryRepository
         $stmt->execute($params);
         $row = $stmt->fetch();
         return $row ?: null;
+    }
+
+    public function delete(int $entryId): void
+    {
+        // Supprimer d'abord les mouvements liés (contrainte FK)
+        $stmt = $this->pdo->prepare('DELETE FROM stock_movements WHERE stock_entry_id = :id');
+        $stmt->execute(['id' => $entryId]);
+
+        $stmt = $this->pdo->prepare('DELETE FROM stock_entries WHERE id = :id');
+        $stmt->execute(['id' => $entryId]);
     }
 
     public function incrementRemaining(int $entryId, int $quantity): void

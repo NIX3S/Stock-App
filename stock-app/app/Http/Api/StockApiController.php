@@ -48,13 +48,14 @@ final class StockApiController
         $productId  = (int) $request->query('product_id', 0);
         $expiryDate = $request->query('expiry_date') ?: null;
         $origin     = $request->query('origin') ?: null;
+        $excludeId  = $request->query('exclude_id') ? (int) $request->query('exclude_id') : null;
 
         if (!$productId) {
             Response::json(['duplicate' => false]);
             return;
         }
 
-        $existing = $this->repository->findDuplicate($productId, $expiryDate, $origin);
+        $existing = $this->repository->findDuplicate($productId, $expiryDate, $origin, $excludeId);
         if ($existing) {
             Response::json([
                 'duplicate'        => true,

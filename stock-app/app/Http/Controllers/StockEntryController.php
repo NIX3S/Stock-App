@@ -36,28 +36,47 @@ final class StockEntryController
             Response::redirect('/stock-entries');
         }
 
-        $quantity = (int) $request->input('quantity', 1);
-        if ($quantity < 1) {
+        $quantity = (int) $request->input('quantity', 0);
+        if ($quantity < 0) {
             Session::flash('error', 'Quantité invalide.');
             Response::redirect('/stock-entries');
         }
 
-        $repo->incrementRemaining((int) $id, $quantity);
+        if ($quantity > 0) {
+            $repo->incrementRemaining((int) $id, $quantity);
+        }
 
-        // Log
-        \App\Core\Logger::log(
+        // Si une entrée source est précisée (fusion depuis la page d'édition), on la supprime
+        $sourceId = $request->input('source_id') ? (int) $request->input('source_id') : null;
+        if ($sourceId && $sourceId !== (int) $id) {
+            $repo->delete($sourceId);
+            \App\Core\Logger::record(
+                'stock_entry_delete',
+                (int) Session::get('user_id'),
+                'stock_entry',
+                $sourceId,
+                ['reason' => 'merged_into', 'target_id' => (int) $id]
+            );
+        }
+
+        \App\Core\Logger::record(
             'stock_entry_merge',
-            "Ajout de {$quantity} unité(s) à l'entrée #{$id} (produit #{$entry['product_id']})",
-            (int) Session::get('user_id')
+            (int) Session::get('user_id'),
+            'stock_entry',
+            (int) $id,
+            ['quantity_added' => $quantity, 'product_id' => (int) $entry['product_id']]
         );
 
         $action = $request->input('action', 'save');
         if ($action === 'save_and_print') {
-            Session::flash('success', "Quantité ajoutée à l'entrée existante. Impression…");
+            Session::flash('success', "Entrées fusionnées. Impression…");
             Response::redirect('/print/label-single?product_id=' . $entry['product_id']);
         }
 
-        Session::flash('success', "Quantité ajoutée à l'entrée existante (ID #{$id}).");
+        $msg = $sourceId
+            ? "Entrée fusionnée dans l'entrée #{$id} et supprimée."
+            : "Quantité ajoutée à l'entrée existante (ID #{$id}).";
+        Session::flash('success', $msg);
         Response::redirect('/stock-entries');
     }
 

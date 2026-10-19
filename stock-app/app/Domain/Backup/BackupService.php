@@ -132,20 +132,43 @@ final class BackupService
             $sql = file_get_contents($sqlFilePath);
             if ($sql === false) return false;
 
-            // Découpe en statements (simpliste mais suffisant pour des dumps mysqldump/PDO propres)
             $pdo->exec('SET FOREIGN_KEY_CHECKS=0');
-            $statements = array_filter(
-                array_map('trim', explode(";\n", $sql)),
-                fn($s) => $s !== '' && !str_starts_with($s, '--')
-            );
-            foreach ($statements as $stmt) {
-                if (trim($stmt)) {
-                    $pdo->exec($stmt);
+
+            // Supprimer toutes les tables existantes avant de restaurer
+            $existingTables = $pdo->query('SHOW TABLES')->fetchAll(\PDO::FETCH_COLUMN);
+            foreach ($existingTables as $table) {
+                $pdo->exec("DROP TABLE IF EXISTS `{$table}`");
+            }
+
+            // Découpe en statements et exécute chacun
+            // On filtre les lignes de commentaires et les statements vides
+            $lines = explode("\n", $sql);
+            $buffer = '';
+            foreach ($lines as $line) {
+                $trimmed = trim($line);
+                // Ignorer les commentaires seuls
+                if ($trimmed === '' || str_starts_with($trimmed, '--')) {
+                    continue;
+                }
+                $buffer .= $line . "\n";
+                // Exécuter quand on atteint la fin d'un statement
+                if (str_ends_with(rtrim($trimmed), ';')) {
+                    $stmt = trim($buffer);
+                    if ($stmt !== '') {
+                        $pdo->exec($stmt);
+                    }
+                    $buffer = '';
                 }
             }
+            // Exécuter le dernier éventuel statement sans point-virgule final
+            if (trim($buffer) !== '') {
+                $pdo->exec(trim($buffer));
+            }
+
             $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
             return true;
         } catch (\Throwable $e) {
+            error_log('[Restore] Erreur PDO : ' . $e->getMessage());
             return false;
         }
     }
